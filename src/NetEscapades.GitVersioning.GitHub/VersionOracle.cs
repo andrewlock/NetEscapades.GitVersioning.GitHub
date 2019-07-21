@@ -4,6 +4,7 @@ using System.ComponentModel.DataAnnotations;
 using System.IO;
 using System.Threading.Tasks;
 using McMaster.Extensions.CommandLineUtils;
+using NetEscapades.GitVersioning.GitHub.Helpers;
 using Octokit;
 
 namespace NetEscapades.GitVersioning.GitHub
@@ -30,8 +31,8 @@ namespace NetEscapades.GitVersioning.GitHub
         [Option("-p|--project", CommandOptionType.SingleValue,
             Description = "The path to the project or project directory. The default is the current directory.")]
         [FileOrDirectoryExists]
-        public string ProjectPath { get; } = ".";
-        
+        public string ProjectPath { get; }
+
         [Required(ErrorMessage = "The GitHub login is required", AllowEmptyStrings = false)]
         [Option("-l|--login", CommandOptionType.SingleValue, Description = "The GitHub login for the user. Required.")]
         public string GitHubLogin { get; }
@@ -43,25 +44,24 @@ namespace NetEscapades.GitVersioning.GitHub
 
         public async Task<int> OnExecute(CommandLineApplication app, IConsole console)
         {
-            var newVersion = await GetVersion();
+            var newVersion = await GetVersion(PathHelpers.NormalizeDirectoryPath(ProjectPath));
 
             console.WriteLine($"Version: {newVersion}");
 
             return Program.OK;
         }
 
-        async Task<string> GetVersion()
+        async Task<string> GetVersion(string projectPath)
         {
             var github = new GitHubClient(new Octokit.ProductHeaderValue(Constants.AppName))
             {
                 Credentials = new Credentials(GitHubLogin, GitHubPassword),
             };
 
-            var workingVersion = VersionFile.GetVersion(ProjectPath, out var actualDirectory);
+            var workingVersion = VersionFile.GetVersion(projectPath, out var actualDirectory);
+            
             var absoluteJsonFilePath = Path.Combine(actualDirectory, VersionFile.JsonFileName);
-            var relativeJsonFilePath = new Uri(ProjectPath, UriKind.Absolute)
-                .MakeRelativeUri(new Uri(absoluteJsonFilePath, UriKind.Absolute))
-                .ToString();
+            var relativeJsonFilePath = PathHelpers.GetRelativePath(absoluteJsonFilePath, projectPath); 
 
             var commitsForVersionFile = await github.Repository.Commit.GetAll(Owner, RepositoryName, new CommitRequest
             {

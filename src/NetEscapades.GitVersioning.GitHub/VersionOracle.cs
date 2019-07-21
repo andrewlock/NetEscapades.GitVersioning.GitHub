@@ -76,19 +76,20 @@ namespace NetEscapades.GitVersioning.GitHub
             if (isNewVersionFile)
             {
                 // we're done, we know what the version must be
-                return GetVersion(workingVersion.Version.Version);
+                return GetVersion(workingVersion.Version.Version, CommitSha);
             }
 
             // we need to calculate the git height
             var compare = await github.Repository.Commit.Compare(Owner, RepositoryName, rootCommitSha, CommitSha);
             var gitHeight = compare.AheadBy + 1;
-            return GetVersion(workingVersion.Version.Version, gitHeight);
+            return GetVersion(workingVersion.Version.Version, CommitSha, gitHeight);
         }
 
-        static string GetVersion(Version version, int gitHeight = 1)
+        static string GetVersion(Version version, string commitSha, int gitHeight = 1)
         {
             // we're done, we know what the version must be
-            return $"{version.Major}.{version.Minor}.{gitHeight}";
+            var buildNo = GitHelper.GetTruncatedCommitIdAsUInt16(commitSha);
+            return $"{version.Major}.{version.Minor}.{gitHeight}.{buildNo}";
         }
 
 
